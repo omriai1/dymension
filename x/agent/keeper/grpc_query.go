@@ -211,6 +211,9 @@ func (k Keeper) ValidationRequestsByAgent(goCtx context.Context, req *types.Quer
 }
 
 func (k Keeper) InvoiceSettlement(goCtx context.Context, req *types.QueryInvoiceSettlementRequest) (*types.QueryInvoiceSettlementResponse, error) {
+	if req.AgentId == "" {
+		return nil, errorsmod.Wrap(gerrc.ErrInvalidArgument, "empty agent id")
+	}
 	recipient, err := sdk.AccAddressFromBech32(req.Recipient)
 	if err != nil {
 		return nil, errorsmod.Wrapf(gerrc.ErrInvalidArgument, "recipient: %v", err)
@@ -219,7 +222,7 @@ func (k Keeper) InvoiceSettlement(goCtx context.Context, req *types.QueryInvoice
 		return nil, errorsmod.Wrap(gerrc.ErrInvalidArgument, "empty invoice ref")
 	}
 	ctx := sdk.UnwrapSDKContext(goCtx)
-	settlement, err := k.invoiceSettlements.Get(ctx, collections.Join(recipient.String(), req.InvoiceRef))
+	settlement, err := k.invoiceSettlements.Get(ctx, collections.Join3(req.AgentId, recipient.String(), req.InvoiceRef))
 	if errors.Is(err, collections.ErrNotFound) {
 		return &types.QueryInvoiceSettlementResponse{}, nil
 	}

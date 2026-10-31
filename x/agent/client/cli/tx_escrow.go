@@ -131,7 +131,7 @@ func CmdSubmitAttestedTransfer() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String(flagInvoiceRef, "", "optional hex invoice reference, settled at most once per recipient")
+	cmd.Flags().String(flagInvoiceRef, "", "optional hex invoice reference, settled at most once per (agent, recipient)")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }

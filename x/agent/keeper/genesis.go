@@ -61,7 +61,7 @@ func InitGenesis(ctx sdk.Context, k *Keeper, g types.GenesisState) {
 		}
 	}
 	for _, s := range g.InvoiceSettlements {
-		if err := k.invoiceSettlements.Set(ctx, collections.Join(s.Recipient, s.InvoiceRef), s.Settlement); err != nil {
+		if err := k.invoiceSettlements.Set(ctx, collections.Join3(s.Settlement.AgentId, s.Recipient, s.InvoiceRef), s.Settlement); err != nil {
 			panic(err)
 		}
 	}
@@ -122,8 +122,8 @@ func ExportGenesis(ctx sdk.Context, k *Keeper) *types.GenesisState {
 	}); err != nil {
 		panic(err)
 	}
-	if err := k.invoiceSettlements.Walk(ctx, nil, func(key collections.Pair[string, []byte], s types.InvoiceSettlement) (bool, error) {
-		g.InvoiceSettlements = append(g.InvoiceSettlements, types.GenesisInvoiceSettlement{Recipient: key.K1(), InvoiceRef: key.K2(), Settlement: s})
+	if err := k.invoiceSettlements.Walk(ctx, nil, func(key collections.Triple[string, string, []byte], s types.InvoiceSettlement) (bool, error) {
+		g.InvoiceSettlements = append(g.InvoiceSettlements, types.GenesisInvoiceSettlement{Recipient: key.K2(), InvoiceRef: key.K3(), Settlement: s})
 		return false, nil
 	}); err != nil {
 		panic(err)

@@ -998,8 +998,9 @@ func (m *ActionLogEntry) GetTime() time.Time {
 }
 
 // InvoiceSettlement is the permanent receipt of the attested transfer that
-// settled an invoice, keyed by (recipient, invoice_ref). A payee verifies it
-// before granting access to the paid-for resource.
+// settled an invoice, keyed by (agent_id, recipient, invoice_ref). A payee
+// verifies it, for the agent it expects to pay, before granting access to the
+// paid-for resource.
 type InvoiceSettlement struct {
 	AgentId string     `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	Amount  types.Coin `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount"`

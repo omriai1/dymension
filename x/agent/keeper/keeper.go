@@ -34,9 +34,11 @@ type Keeper struct {
 	validationRequests  collections.Map[[]byte, types.ValidationRequest]
 	validationResponses collections.Map[collections.Pair[[]byte, uint64], types.ValidationResponse]
 	validationByAgent   collections.KeySet[collections.Pair[string, []byte]]
-	// invoiceSettlements is keyed by (recipient, invoice_ref): invoices are
-	// issued by the payee, so the dedup namespace is payee-scoped.
-	invoiceSettlements collections.Map[collections.Pair[string, []byte], types.InvoiceSettlement]
+	// invoiceSettlements is keyed by (agent_id, recipient, invoice_ref). Only the
+	// paying agent's enclave authorizes a ref, so the dedup namespace must be
+	// payer-scoped: a shared per-recipient namespace would let any other agent
+	// claim a payee's ref first and block the legitimate payer forever.
+	invoiceSettlements collections.Map[collections.Triple[string, string, []byte], types.InvoiceSettlement]
 }
 
 func NewKeeper(
@@ -76,7 +78,7 @@ func NewKeeper(
 		validationResponses: collections.NewMap(sb, collections.NewPrefix(types.KeyValidationResponses), "validation_responses", collections.PairKeyCodec(collections.BytesKey, collections.Uint64Key), collcompat.ProtoValue[types.ValidationResponse](cdc)),
 		validationByAgent:   collections.NewKeySet(sb, collections.NewPrefix(types.KeyValidationByAgent), "validation_by_agent", collections.PairKeyCodec(collections.StringKey, collections.BytesKey)),
 		invoiceSettlements: collections.NewMap(sb, collections.NewPrefix(types.KeyInvoiceSettlements), "invoice_settlements",
-			collections.PairKeyCodec(collections.StringKey, collections.BytesKey), collcompat.ProtoValue[types.InvoiceSettlement](cdc)),
+			collections.TripleKeyCodec(collections.StringKey, collections.StringKey, collections.BytesKey), collcompat.ProtoValue[types.InvoiceSettlement](cdc)),
 	}
 
 	if _, err := sb.Build(); err != nil {

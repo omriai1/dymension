@@ -23,8 +23,8 @@ func (s *EscrowTestSuite) invoiceTransferMsg(id string, recipient sdk.AccAddress
 	return msg
 }
 
-func (s *EscrowTestSuite) invoiceSettlement(recipient sdk.AccAddress, invoiceRef []byte) *types.QueryInvoiceSettlementResponse {
-	res, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{Recipient: recipient.String(), InvoiceRef: invoiceRef})
+func (s *EscrowTestSuite) invoiceSettlement(agentID string, recipient sdk.AccAddress, invoiceRef []byte) *types.QueryInvoiceSettlementResponse {
+	res, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{AgentId: agentID, Recipient: recipient.String(), InvoiceRef: invoiceRef})
 	s.Require().NoError(err)
 	return res
 }
@@ -35,13 +35,13 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_SettlesOnce() {
 	_, _, recipient := testdata.KeyTestPubAddr()
 	ref := []byte("inv-\x00-7")
 
-	s.Require().False(s.invoiceSettlement(recipient, ref).Settled)
+	s.Require().False(s.invoiceSettlement("a1", recipient, ref).Settled)
 
 	s.Ctx = s.Ctx.WithBlockHeight(42)
 	_, err := s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("a1", recipient, 100, 0, ref))
 	s.Require().NoError(err)
 
-	res := s.invoiceSettlement(recipient, ref)
+	res := s.invoiceSettlement("a1", recipient, ref)
 	s.Require().True(res.Settled)
 	s.Require().Equal(types.InvoiceSettlement{
 		AgentId: "a1",
@@ -73,8 +73,8 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_SettlesOnce() {
 	s.Require().NoError(err)
 }
 
-// TestInvoiceTransfer_RecipientScoped pins the payee-scoped namespace: one
-// payee settling a ref does not block another payee issuing the same ref.
+// TestInvoiceTransfer_RecipientScoped pins that, within one agent, settling a
+// ref to one payee does not block paying the same ref to another payee.
 func (s *EscrowTestSuite) TestInvoiceTransfer_RecipientScoped() {
 	s.spendingAgent("a1")
 	s.fundEscrow("a1", 500)
@@ -84,13 +84,13 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_RecipientScoped() {
 
 	_, err := s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("a1", first, 100, 0, ref))
 	s.Require().NoError(err)
-	s.Require().False(s.invoiceSettlement(second, ref).Settled)
+	s.Require().False(s.invoiceSettlement("a1", second, ref).Settled)
 
 	_, err = s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("a1", second, 100, 1, ref))
 	s.Require().NoError(err)
-	s.Require().True(s.invoiceSettlement(first, ref).Settled)
-	s.Require().True(s.invoiceSettlement(second, ref).Settled)
-	s.Require().Equal(uint64(1), s.invoiceSettlement(second, ref).Settlement.Seq)
+	s.Require().True(s.invoiceSettlement("a1", first, ref).Settled)
+	s.Require().True(s.invoiceSettlement("a1", second, ref).Settled)
+	s.Require().Equal(uint64(1), s.invoiceSettlement("a1", second, ref).Settlement.Seq)
 }
 
 // TestInvoiceTransfer_UppercaseRecipientSameNamespace pins that the
@@ -112,9 +112,59 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_UppercaseRecipientSameNamespace() 
 	_, err = s.msgServer.SubmitAttestedTransfer(s.Ctx, msg)
 	s.Require().ErrorIs(err, types.ErrInvoiceAlreadySettled)
 
-	res, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{Recipient: upper, InvoiceRef: ref})
+	res, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{AgentId: "a1", Recipient: upper, InvoiceRef: ref})
 	s.Require().NoError(err)
 	s.Require().True(res.Settled)
+}
+
+// TestInvoiceTransfer_OtherAgentCannotSquat pins the payer-scoped namespace:
+// independently owned agents paying a merchant's invoice ref with the wrong
+// amount or the wrong denom do not consume it, so the expected payer still
+// settles it exactly once and its receipt reflects only its own payment.
+func (s *EscrowTestSuite) TestInvoiceTransfer_OtherAgentCannotSquat() {
+	_, _, merchant := testdata.KeyTestPubAddr()
+	ref := []byte("inv-123") // issued to a1 for 100adym
+
+	s.spendingAgent("a1")
+	s.fundEscrow("a1", 500)
+
+	// b1: wrong amount, same denom
+	s.spendingAgent("b1")
+	s.fundEscrow("b1", 500)
+	_, err := s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("b1", merchant, 1, 0, ref))
+	s.Require().NoError(err)
+
+	// b2: wrong denom
+	const otherDenom = "uatom"
+	b2Owner := s.registerAgent("b2")
+	_, err = s.msgServer.UpdateAgentSpendPolicy(s.Ctx,
+		types.NewMsgUpdateAgentSpendPolicy(b2Owner.String(), "b2", otherDenom, math.NewInt(windowLimit), windowLen))
+	s.Require().NoError(err)
+	_, _, funder := testdata.KeyTestPubAddr()
+	coins := sdk.NewCoins(sdk.NewInt64Coin(otherDenom, 500))
+	s.FundAcc(funder, coins)
+	_, err = s.msgServer.FundAgentEscrow(s.Ctx, types.NewMsgFundAgentEscrow(funder.String(), "b2", coins))
+	s.Require().NoError(err)
+	b2Msg := s.invoiceTransferMsg("b2", merchant, 1, 0, ref)
+	b2Payload := types.AttestedTransferBytes(merchant.String(), otherDenom, b2Msg.Amount, ref, b2Msg.Memo)
+	b2Msg.Token = types.TransferNonce("b2", b2Payload, 0, true)
+	_, err = s.msgServer.SubmitAttestedTransfer(s.Ctx, b2Msg)
+	s.Require().NoError(err)
+
+	s.Require().False(s.invoiceSettlement("a1", merchant, ref).Settled)
+
+	_, err = s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("a1", merchant, 100, 0, ref))
+	s.Require().NoError(err)
+
+	res := s.invoiceSettlement("a1", merchant, ref)
+	s.Require().True(res.Settled)
+	s.Require().Equal(sdk.NewInt64Coin(spendDenom, 100), res.Settlement.Amount)
+	s.Require().Equal(sdk.NewInt64Coin(spendDenom, 1), s.invoiceSettlement("b1", merchant, ref).Settlement.Amount)
+	s.Require().Equal(sdk.NewInt64Coin(otherDenom, 1), s.invoiceSettlement("b2", merchant, ref).Settlement.Amount)
+
+	// a1 still cannot pay the same invoice twice
+	_, err = s.msgServer.SubmitAttestedTransfer(s.Ctx, s.invoiceTransferMsg("a1", merchant, 100, 1, ref))
+	s.Require().ErrorIs(err, types.ErrInvoiceAlreadySettled)
 }
 
 func (s *EscrowTestSuite) TestTransfer_EmptyInvoiceRefIsLegacy() {
@@ -173,7 +223,7 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_RefNotAttestedRejected() {
 	agent, _ := s.k.GetAgent(s.Ctx, "a1")
 	s.Require().Equal(uint64(0), agent.ActionSeq)
 	s.Require().Equal(math.NewInt(500), s.k.GetEscrowBalance(s.Ctx, "a1").AmountOf(spendDenom))
-	s.Require().False(s.invoiceSettlement(recipient, ref).Settled)
+	s.Require().False(s.invoiceSettlement("a1", recipient, ref).Settled)
 }
 
 func (s *EscrowTestSuite) TestInvoiceTransfer_RefTooLong() {
@@ -195,11 +245,13 @@ func (s *EscrowTestSuite) TestInvoiceTransfer_RefTooLong() {
 
 func (s *EscrowTestSuite) TestInvoiceSettlementQuery_RejectsEmptyKey() {
 	_, _, recipient := testdata.KeyTestPubAddr()
-	_, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{InvoiceRef: []byte("x")})
+	_, err := s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{Recipient: recipient.String(), InvoiceRef: []byte("x")})
+	s.Require().ErrorContains(err, "empty agent id")
+	_, err = s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{AgentId: "a1", InvoiceRef: []byte("x")})
 	s.Require().ErrorContains(err, "recipient")
-	_, err = s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{Recipient: "invalid", InvoiceRef: []byte("x")})
+	_, err = s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{AgentId: "a1", Recipient: "invalid", InvoiceRef: []byte("x")})
 	s.Require().ErrorContains(err, "recipient")
-	_, err = s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{Recipient: recipient.String()})
+	_, err = s.k.InvoiceSettlement(s.Ctx, &types.QueryInvoiceSettlementRequest{AgentId: "a1", Recipient: recipient.String()})
 	s.Require().ErrorContains(err, "empty invoice ref")
 }
 
@@ -222,7 +274,7 @@ func (s *EscrowTestSuite) TestInvoiceSettlement_GenesisRoundTrip() {
 	keeper.InitGenesis(s.Ctx, s.k, *exported)
 	s.Require().Equal(exported.InvoiceSettlements, keeper.ExportGenesis(s.Ctx, s.k).InvoiceSettlements)
 	for _, ref := range refs {
-		res := s.invoiceSettlement(recipient, ref)
+		res := s.invoiceSettlement("a1", recipient, ref)
 		s.Require().True(res.Settled, hex.EncodeToString(ref))
 		s.Require().Equal("a1", res.Settlement.AgentId)
 	}

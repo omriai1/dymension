@@ -95,11 +95,13 @@ func (g GenesisState) Validate() error {
 	settlements := make(map[string]struct{}, len(g.InvoiceSettlements))
 	for _, s := range g.InvoiceSettlements {
 		if err := s.Validate(agentIDs); err != nil {
-			return fmt.Errorf("invoice settlement: recipient %s invoice ref %x: %w", s.Recipient, s.InvoiceRef, err)
+			return fmt.Errorf("invoice settlement: agent %s recipient %s invoice ref %x: %w", s.Settlement.AgentId, s.Recipient, s.InvoiceRef, err)
 		}
-		key := s.Recipient + "/" + string(s.InvoiceRef)
+		// %q delimits the free-form agent ID and bech32 has no '/', so the key
+		// is unambiguous
+		key := fmt.Sprintf("%q/%s/%s", s.Settlement.AgentId, s.Recipient, s.InvoiceRef)
 		if _, dup := settlements[key]; dup {
-			return fmt.Errorf("duplicate invoice settlement: recipient %s invoice ref %x", s.Recipient, s.InvoiceRef)
+			return fmt.Errorf("duplicate invoice settlement: agent %s recipient %s invoice ref %x", s.Settlement.AgentId, s.Recipient, s.InvoiceRef)
 		}
 		settlements[key] = struct{}{}
 	}

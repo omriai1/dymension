@@ -45,6 +45,16 @@ func TestGenesisValidate(t *testing.T) {
 	require.NoError(t, valid().Validate())
 	require.NoError(t, types.DefaultGenesis().Validate())
 
+	// settlements are payer-scoped: another agent may hold the same recipient/ref
+	otherPayer := valid()
+	a2 := spendingAgent()
+	a2.Id = "a2"
+	otherPayer.Agents = append(otherPayer.Agents, a2)
+	dup := otherPayer.InvoiceSettlements[0]
+	dup.Settlement.AgentId = "a2"
+	otherPayer.InvoiceSettlements = append(otherPayer.InvoiceSettlements, dup)
+	require.NoError(t, otherPayer.Validate())
+
 	// a settlement recorded before invoice_ref_max_bytes was lowered still imports
 	lowered := valid()
 	lowered.Params.InvoiceRefMaxBytes = 1

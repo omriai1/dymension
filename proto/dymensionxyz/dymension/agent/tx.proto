@@ -44,9 +44,9 @@ service Msg {
 
   // SubmitAttestedTransfer verifies a TEE attestation token bound to a
   // specific (recipient, denom, amount, invoice_ref, memo), checks the
-  // per-window spend budget, rejects an invoice already settled to the
-  // recipient, pays out from the agent's escrow, and appends an entry to the
-  // agent's action log.
+  // per-window spend budget, rejects an invoice the agent already settled to
+  // the recipient, pays out from the agent's escrow, and appends an entry to
+  // the agent's action log.
   rpc SubmitAttestedTransfer(MsgSubmitAttestedTransfer)
       returns (MsgSubmitAttestedTransferResponse);
 
@@ -180,8 +180,8 @@ message MsgSubmitAttestedTransfer {
   ];
   bytes memo = 5;
   string token = 6;
-  // invoice_ref, if non-empty, is settled at most once per recipient. It is
-  // part of the attested payload, so the enclave authorizes it.
+  // invoice_ref, if non-empty, is settled at most once per (agent, recipient).
+  // It is part of the attested payload, so the enclave authorizes it.
   bytes invoice_ref = 7;
 }
 

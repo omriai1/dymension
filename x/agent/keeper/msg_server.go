@@ -123,7 +123,7 @@ func (k msgServer) SubmitAttestedAction(goCtx context.Context, msg *types.MsgSub
 // SubmitAttestedAction. The nonce commits to the exact (recipient, denom,
 // amount, invoice_ref, memo) in the transfer domain, so the enclave — not the
 // submitter — authorizes the payment. A non-empty invoice_ref settles at most
-// once per recipient and leaves a queryable settlement receipt.
+// once per (agent, recipient) and leaves a queryable settlement receipt.
 func (k msgServer) SubmitAttestedTransfer(goCtx context.Context, msg *types.MsgSubmitAttestedTransfer) (*types.MsgSubmitAttestedTransferResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
@@ -176,14 +176,14 @@ func (k msgServer) SubmitAttestedTransfer(goCtx context.Context, msg *types.MsgS
 	recipient := sdk.MustAccAddressFromBech32(msg.Recipient)
 	// key by the canonical address: bech32 also accepts an all-uppercase
 	// spelling, which would otherwise open a second namespace for the same payee
-	invoiceKey := collections.Join(recipient.String(), msg.InvoiceRef)
+	invoiceKey := collections.Join3(msg.AgentId, recipient.String(), msg.InvoiceRef)
 	if invoiced {
 		settled, err := k.invoiceSettlements.Has(ctx, invoiceKey)
 		if err != nil {
 			return nil, errorsmod.Wrap(err, "has invoice settlement")
 		}
 		if settled {
-			return nil, errorsmod.Wrapf(types.ErrInvoiceAlreadySettled, "recipient %s invoice ref %x", msg.Recipient, msg.InvoiceRef)
+			return nil, errorsmod.Wrapf(types.ErrInvoiceAlreadySettled, "agent %s recipient %s invoice ref %x", msg.AgentId, msg.Recipient, msg.InvoiceRef)
 		}
 	}
 

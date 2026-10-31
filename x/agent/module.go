@@ -223,9 +223,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "InvoiceSettlement",
-					Use:            "invoice-settlement [recipient] [invoice-ref-hex]",
-					Short:          "Show whether an invoice has been settled to a recipient",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "recipient"}, {ProtoField: "invoice_ref"}},
+					Use:            "invoice-settlement [agent-id] [recipient] [invoice-ref-hex]",
+					Short:          "Show whether an agent has settled an invoice to a recipient",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "agent_id"}, {ProtoField: "recipient"}, {ProtoField: "invoice_ref"}},
 				},
 			},
 		},

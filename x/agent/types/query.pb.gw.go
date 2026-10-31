@@ -826,6 +826,17 @@ func request_Query_InvoiceSettlement_0(ctx context.Context, marshaler runtime.Ma
 		_   = err
 	)
 
+	val, ok = pathParams["agent_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "agent_id")
+	}
+
+	protoReq.AgentId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "agent_id", err)
+	}
+
 	val, ok = pathParams["recipient"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "recipient")
@@ -863,6 +874,17 @@ func local_request_Query_InvoiceSettlement_0(ctx context.Context, marshaler runt
 		err error
 		_   = err
 	)
+
+	val, ok = pathParams["agent_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "agent_id")
+	}
+
+	protoReq.AgentId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "agent_id", err)
+	}
 
 	val, ok = pathParams["recipient"]
 	if !ok {
@@ -1615,7 +1637,7 @@ var (
 
 	pattern_Query_ValidationRequestsByAgent_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"dymensionxyz", "dymension", "agent", "agents", "agent_id", "validations"}, "", runtime.AssumeColonVerbOpt(false)))
 
-	pattern_Query_InvoiceSettlement_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 1, 0, 4, 1, 5, 5}, []string{"dymensionxyz", "dymension", "agent", "invoice-settlements", "recipient", "invoice_ref"}, "", runtime.AssumeColonVerbOpt(false)))
+	pattern_Query_InvoiceSettlement_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 1, 0, 4, 1, 5, 7}, []string{"dymensionxyz", "dymension", "agent", "agents", "agent_id", "invoice-settlements", "recipient", "invoice_ref"}, "", runtime.AssumeColonVerbOpt(false)))
 )
 
 var (

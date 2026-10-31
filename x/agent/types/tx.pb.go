@@ -756,8 +756,8 @@ type MsgSubmitAttestedTransfer struct {
 	Amount    cosmossdk_io_math.Int `protobuf:"bytes,4,opt,name=amount,proto3,customtype=cosmossdk.io/math.Int" json:"amount"`
 	Memo      []byte                `protobuf:"bytes,5,opt,name=memo,proto3" json:"memo,omitempty"`
 	Token     string                `protobuf:"bytes,6,opt,name=token,proto3" json:"token,omitempty"`
-	// invoice_ref, if non-empty, is settled at most once per recipient. It is
-	// part of the attested payload, so the enclave authorizes it.
+	// invoice_ref, if non-empty, is settled at most once per (agent, recipient).
+	// It is part of the attested payload, so the enclave authorizes it.
 	InvoiceRef []byte `protobuf:"bytes,7,opt,name=invoice_ref,json=invoiceRef,proto3" json:"invoice_ref,omitempty"`
 }
 
@@ -1859,9 +1859,9 @@ type MsgClient interface {
 	UpdateAgentSpendPolicy(ctx context.Context, in *MsgUpdateAgentSpendPolicy, opts ...grpc.CallOption) (*MsgUpdateAgentSpendPolicyResponse, error)
 	// SubmitAttestedTransfer verifies a TEE attestation token bound to a
 	// specific (recipient, denom, amount, invoice_ref, memo), checks the
-	// per-window spend budget, rejects an invoice already settled to the
-	// recipient, pays out from the agent's escrow, and appends an entry to the
-	// agent's action log.
+	// per-window spend budget, rejects an invoice the agent already settled to
+	// the recipient, pays out from the agent's escrow, and appends an entry to
+	// the agent's action log.
 	SubmitAttestedTransfer(ctx context.Context, in *MsgSubmitAttestedTransfer, opts ...grpc.CallOption) (*MsgSubmitAttestedTransferResponse, error)
 	// RevokePolicy adds a policy fingerprint to the revocation denylist.
 	// Governance only.
@@ -2045,9 +2045,9 @@ type MsgServer interface {
 	UpdateAgentSpendPolicy(context.Context, *MsgUpdateAgentSpendPolicy) (*MsgUpdateAgentSpendPolicyResponse, error)
 	// SubmitAttestedTransfer verifies a TEE attestation token bound to a
 	// specific (recipient, denom, amount, invoice_ref, memo), checks the
-	// per-window spend budget, rejects an invoice already settled to the
-	// recipient, pays out from the agent's escrow, and appends an entry to the
-	// agent's action log.
+	// per-window spend budget, rejects an invoice the agent already settled to
+	// the recipient, pays out from the agent's escrow, and appends an entry to
+	// the agent's action log.
 	SubmitAttestedTransfer(context.Context, *MsgSubmitAttestedTransfer) (*MsgSubmitAttestedTransferResponse, error)
 	// RevokePolicy adds a policy fingerprint to the revocation denylist.
 	// Governance only.
