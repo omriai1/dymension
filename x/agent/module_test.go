@@ -16,3 +16,15 @@ func TestAutoCLIValidationQueries(t *testing.T) {
 		require.True(t, methods[method], method)
 	}
 }
+
+func TestAutoCLIInvoiceSettlementQuery(t *testing.T) {
+	for _, command := range (AppModule{}).AutoCLIOptions().Query.RpcCommandOptions {
+		if command.RpcMethod == "InvoiceSettlement" {
+			require.Len(t, command.PositionalArgs, 2)
+			require.Equal(t, "recipient", command.PositionalArgs[0].ProtoField)
+			require.Equal(t, "invoice_ref", command.PositionalArgs[1].ProtoField)
+			return
+		}
+	}
+	t.Fatal("InvoiceSettlement query not registered")
+}

@@ -34,6 +34,9 @@ type Keeper struct {
 	validationRequests  collections.Map[[]byte, types.ValidationRequest]
 	validationResponses collections.Map[collections.Pair[[]byte, uint64], types.ValidationResponse]
 	validationByAgent   collections.KeySet[collections.Pair[string, []byte]]
+	// invoiceSettlements is keyed by (recipient, invoice_ref): invoices are
+	// issued by the payee, so the dedup namespace is payee-scoped.
+	invoiceSettlements collections.Map[collections.Pair[string, []byte], types.InvoiceSettlement]
 }
 
 func NewKeeper(
@@ -72,6 +75,8 @@ func NewKeeper(
 		validationRequests:  collections.NewMap(sb, collections.NewPrefix(types.KeyValidationRequests), "validation_requests", collections.BytesKey, collcompat.ProtoValue[types.ValidationRequest](cdc)),
 		validationResponses: collections.NewMap(sb, collections.NewPrefix(types.KeyValidationResponses), "validation_responses", collections.PairKeyCodec(collections.BytesKey, collections.Uint64Key), collcompat.ProtoValue[types.ValidationResponse](cdc)),
 		validationByAgent:   collections.NewKeySet(sb, collections.NewPrefix(types.KeyValidationByAgent), "validation_by_agent", collections.PairKeyCodec(collections.StringKey, collections.BytesKey)),
+		invoiceSettlements: collections.NewMap(sb, collections.NewPrefix(types.KeyInvoiceSettlements), "invoice_settlements",
+			collections.PairKeyCodec(collections.StringKey, collections.BytesKey), collcompat.ProtoValue[types.InvoiceSettlement](cdc)),
 	}
 
 	if _, err := sb.Build(); err != nil {
